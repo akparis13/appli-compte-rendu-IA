@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Compte rendu</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#667;--ac:#1d5fd1;--bd:#d8dce2}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15181c;--card:#1f2328;--tx:#e8eaed;--mu:#9aa;--ac:#5b9bff;--bd:#343a42}}
+:root[data-theme="dark"]{--bg:#15181c;--card:#1f2328;--tx:#e8eaed;--mu:#9aa;--ac:#5b9bff;--bd:#343a42}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:720px;margin:0 auto;padding:14px}
+h1{font-size:22px;margin:6px 0 12px}
+section{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);margin:0 0 10px}
+label{display:block;font-size:13px;color:var(--mu);margin:8px 0 3px}
+input,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:220px;resize:vertical}select{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}button:disabled{opacity:.5}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{padding:10px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+button.s{background:transparent;color:var(--ac);border:1px solid var(--ac)}
+button.rec{background:#d33}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+canvas{width:100%;height:150px;border:1px dashed var(--bd);border-radius:8px;background:#fff;touch-action:none;display:block}
+.th{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.th div{position:relative}.th img{height:80px;border-radius:6px;display:block}
+.th b{position:absolute;top:2px;right:2px;background:#000a;color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;font-size:13px;cursor:pointer}
+#lg{max-height:50px;margin-top:6px}
+small{color:var(--mu)}
+</style></head><body><main>
+<h1>📝 Compte rendu</h1>
+
+<section><h2>Informations</h2>
+<div class="row"><div><label>Expéditeur</label><input id="from" placeholder="Nom, société"></div>
+<div><label>Destinataire</label><input id="to" placeholder="Nom, société"></div></div>
+<div class="row"><div><label>E-mail du destinataire</label><input id="mail" type="email"></div>
+<div><label>Date</label><input id="date" type="date"></div></div>
+<label>Objet</label><input id="subj" placeholder="Objet du compte rendu">
+<label>Logo de l'entreprise (facultatif)</label><input id="logo" type="file" accept="image/*">
+<img id="lg" hidden alt="">
+</section>
+
+<section><h2>Contenu</h2>
+<div class="bar"><button id="mic" type="button">🎙️ Dicter</button><small id="ms" style="align-self:center"></small></div>
+<label>Transcription brute (dictée ou collage)</label>
+<textarea id="raw" style="min-height:130px" placeholder="Appuyez sur « Dicter » et parlez, ou collez une transcription (Teams, Otter, Dictaphone…)"></textarea>
+</section>
+
+<section><h2>Synthèse par IA</h2>
+<label>Code d'accès</label><input id="ac" type="password" autocomplete="off" placeholder="Code fourni par votre contact">
+<label>Type de rendu</label>
+<select id="fmt"><option value="cr">Compte rendu structuré (contexte, points, décisions, actions)</option><option value="court">Résumé court</option><option value="actions">Liste d'actions et décisions</option></select>
+<label style="display:flex;gap:8px;align-items:center;color:var(--tx)"><input id="ap" type="checkbox" checked style="width:auto"> Analyser les photos (modèle plus puissant, 3 crédits)</label>
+<div class="bar"><button id="sy" type="button">✨ Synthétiser</button><button class="s" id="cp" type="button">Utiliser tel quel</button><button class="s" id="ab" type="button" hidden>Annuler</button></div>
+<small id="sm"></small>
+<label>Compte rendu final (modifiable, c'est ce qui est exporté)</label>
+<textarea id="txt"></textarea>
+</section>
+
+<section><h2>Photos</h2>
+<input id="ph" type="file" accept="image/*" capture="environment" multiple>
+<div class="th" id="th"></div>
+</section>
+
+<section><h2>Signature</h2>
+<canvas id="sg"></canvas>
+<div class="bar"><button class="s" id="clr" type="button">Effacer</button></div>
+</section>
+
+<section><h2>Export</h2>
+<div class="bar"><button id="bp" type="button">PDF</button><button id="bw" type="button">Word</button><button id="bs" type="button">✉️ Envoyer par e-mail</button></div>
+<small id="st"></small>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+$('date').valueAsDate=new Date();
+let logo=null,photos=[],signed=false;
+
+// Image -> JPEG réduit
+function load(file,max=1200){return new Promise(r=>{const i=new Image();i.onload=()=>{const mk=(m,q)=>{const k=Math.min(1,m/i.width),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(i,0,0,c.width,c.height);return{u:c.toDataURL('image/jpeg',q),w:c.width,h:c.height}};const a=mk(max,.85);r({d:a.u,w:a.w,h:a.h,s:max>600?mk(768,.7).u:null})};i.src=URL.createObjectURL(file)})}
+$('logo').onchange=async e=>{const f=e.target.files[0];if(!f){logo=null;$('lg').hidden=true;return}logo=await load(f,500);$('lg').src=logo.d;$('lg').hidden=false};
+$('ph').onchange=async e=>{for(const f of e.target.files)photos.push(await load(f));e.target.value='';drawPh()};
+function drawPh(){$('th').innerHTML='';photos.forEach((p,i)=>{const d=document.createElement('div');d.innerHTML='<img src="'+p.d+'"><b>×</b>';d.querySelector('b').onclick=()=>{photos.splice(i,1);drawPh()};$('th').append(d)})}
+
+// Signature
+const cv=$('sg'),cx=cv.getContext('2d');let dr=false;
+function fit(){const r=cv.getBoundingClientRect();cv.width=r.width*2;cv.height=r.height*2;cx.scale(2,2);cx.lineWidth=2;cx.lineCap='round';cx.strokeStyle='#000'}
+fit();
+const pt=e=>{const r=cv.getBoundingClientRect();return[e.clientX-r.left,e.clientY-r.top]};
+cv.onpointerdown=e=>{dr=true;signed=true;cv.setPointerCapture(e.pointerId);cx.beginPath();cx.moveTo(...pt(e))};
+cv.onpointermove=e=>{if(dr){cx.lineTo(...pt(e));cx.stroke()}};
+cv.onpointerup=()=>dr=false;
+$('clr').onclick=()=>{cx.clearRect(0,0,cv.width,cv.height);signed=false};
+
+// Dictée
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec,on=false;
+$('mic').onclick=()=>{
+ if(!SR){$('ms').textContent='Dictée non supportée : utilisez Chrome ou Safari.';return}
+ if(on){on=false;rec.stop();return}
+ rec=new SR();rec.lang='fr-FR';rec.continuous=true;rec.interimResults=false;
+ rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal){const t=$('raw');t.value+=(t.value&&!t.value.endsWith('\n')?' ':'')+e.results[i][0].transcript.trim()}};
+ rec.onerror=e=>{$('ms').textContent='Erreur micro : '+e.error};
+ rec.onend=()=>{if(on)try{rec.start()}catch(_){}else ui(false)};
+ on=true;try{rec.start();ui(true)}catch(_){on=false}
+};
+function ui(a){$('mic').textContent=a?'⏹ Arrêter':'🎙️ Dicter';$('mic').className=a?'rec':'';$('ms').textContent=a?'Écoute en cours…':''}
+
+// Génération
+const v=id=>$(id).value.trim();
+const fdate=()=>{const d=$('date').value;return d?new Date(d).toLocaleDateString('fr-FR'):''};
+const sig=()=>signed?cv.toDataURL('image/png'):null;
+function makePDF(){
+ const {jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4'}),M=15,W=180;let y=15;
+ const chk=h=>{if(y+h>282){doc.addPage();y=15}};
+ if(logo){const h=Math.min(20,logo.h/logo.w*45),w=h*logo.w/logo.h;doc.addImage(logo.d,'JPEG',M,y,w,h);y+=h+6}
+ doc.setFont('helvetica','bold');doc.setFontSize(18);doc.text('Compte rendu',M,y+6);y+=14;
+ doc.setFontSize(11);
+ [['De',v('from')],['À',v('to')],['Date',fdate()],['Objet',v('subj')]].forEach(([k,val])=>{if(!val)return;doc.setFont('helvetica','bold');doc.text(k+' :',M,y);doc.setFont('helvetica','normal');const l=doc.splitTextToSize(val,W-20);doc.text(l,M+20,y);y+=6*l.length});
+ y+=2;doc.line(M,y,M+W,y);y+=8;doc.setFont('helvetica','normal');
+ doc.splitTextToSize($('txt').value,W).forEach(l=>{chk(6);doc.text(l,M,y);y+=5.5});
+ y+=6;
+ photos.forEach((p,i)=>{const w=Math.min(W,110),h=w*p.h/p.w;chk(h+10);doc.setFont('helvetica','bold');doc.setFontSize(9);doc.text('Photo '+(i+1),M,y);y+=2;doc.addImage(p.d,'JPEG',M,y,w,h);y+=h+6;doc.setFontSize(11)});
+ const s=sig();if(s){chk(35);y+=4;doc.setFont('helvetica','bold');doc.text('Signature :',M,y);y+=3;doc.addImage(s,'PNG',M,y,60,30);}
+ return doc.output('blob');
+}
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+function makeDOC(){
+ let h='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>body{font-family:Calibri,Arial;font-size:11pt}</style></head><body>';
+ if(logo)h+='<p><img src="'+logo.d+'" height="'+Math.round(Math.min(60,logo.h/logo.w*150))+'"></p>';
+ h+='<h1>Compte rendu</h1>';
+ [['De',v('from')],['À',v('to')],['Date',fdate()],['Objet',v('subj')]].forEach(([k,val])=>{if(val)h+='<p><b>'+k+' :</b> '+esc(val)+'</p>'});
+ h+='<hr><p>'+esc($('txt').value)+'</p>';
+ photos.forEach((p,i)=>h+='<p><b>Photo '+(i+1)+'</b><br><img src="'+p.d+'" width="400"></p>');
+ const s=sig();if(s)h+='<p><b>Signature :</b><br><img src="'+s+'" width="200"></p>';
+ return new Blob(['\ufeff'+h+'</body></html>'],{type:'application/msword'});
+}
+const name=()=>'compte-rendu-'+($('date').value||'sans-date');
+const API_URL='https://appli-ia-transcription.akparis13.workers.dev';
+let dl=null;
+if(window.claude){claude.use('downloads').then(x=>dl=x).catch(()=>{})}
+async function save(b,n){
+ if(dl){try{await dl.save({filename:n,data:b});return}catch(e){if(e.code==='declined')return}}
+ const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click()}
+try{$('ac').value=localStorage.getItem('cr_code')||''}catch(_){}
+let ctl=null;
+$('sy').onclick=async()=>{
+ const raw=$('raw').value.trim(),code=$('ac').value.trim();
+ if(!raw){$('sm').textContent='Dictez ou collez d\'abord une transcription.';return}
+ if(!code){$('sm').textContent='Saisissez votre code d\'accès.';return}
+ if(API_URL.includes('VOTRE-WORKER')){$('sm').textContent='Serveur non configuré : renseignez API_URL dans index.html.';return}
+ try{localStorage.setItem('cr_code',code)}catch(_){}
+ ctl=new AbortController();$('sy').disabled=true;$('ab').hidden=false;$('sm').textContent='Rédaction en cours…';
+ try{
+  const r=await fetch(API_URL,{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json','X-Access-Code':code},body:JSON.stringify({raw,format:$('fmt').value,from:v('from'),to:v('to'),subj:v('subj'),photos:$('ap').checked?photos.map(p=>p.s).filter(Boolean):[]})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(d.error||('Erreur '+r.status));
+  $('txt').value=d.text;$('sm').textContent='Synthèse prête : relisez et corrigez avant d\'exporter.'+(d.remaining!=null?' Il vous reste '+d.remaining+' crédit(s) ce mois-ci.':'');
+ }catch(e){$('sm').textContent=e.name==='AbortError'?'Annulé.':e.message==='Failed to fetch'?'Serveur injoignable.':e.message}
+ $('sy').disabled=false;$('ab').hidden=true};
+$('ab').onclick=()=>ctl&&ctl.abort();
+$('cp').onclick=()=>{$('txt').value=$('raw').value};
+function ok(){if(!$('txt').value.trim()){$('st').textContent='Le compte rendu final est vide : synthétisez ou utilisez la transcription telle quelle.';return false}$('st').textContent='';return true}
+$('bp').onclick=()=>{if(ok())save(makePDF(),name()+'.pdf')};
+$('bw').onclick=()=>{if(ok())save(makeDOC(),name()+'.doc')};
+$('bs').onclick=async()=>{
+ if(!ok())return;
+ const p=new File([makePDF()],name()+'.pdf',{type:'application/pdf'});
+ const w=new File([makeDOC()],name()+'.doc',{type:'application/msword'});
+ const subj='Compte rendu'+(v('subj')?' – '+v('subj'):''),body='Bonjour,\n\nVeuillez trouver ci-joint le compte rendu.\n\nCordialement,\n'+v('from');
+ try{
+  if(navigator.canShare&&navigator.canShare({files:[p,w]})){await navigator.share({files:[p,w],title:subj,text:body});return}
+ }catch(e){if(e.name==='AbortError')return}
+ await save(p,p.name);await save(w,w.name);
+ location.href='mailto:'+encodeURIComponent(v('mail'))+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+ $('st').textContent='Fichiers téléchargés : joignez-les à l\'e-mail qui s\'ouvre.';
+};
+</script></body></html>

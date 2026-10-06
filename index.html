@@ -2,6 +2,7 @@
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Compte rendu</title>
+<link rel="icon" href="data:,">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#667;--ac:#1d5fd1;--bd:#d8dce2}
@@ -100,7 +101,7 @@ $('mic').onclick=()=>{
  if(on){on=false;rec.stop();return}
  rec=new SR();rec.lang='fr-FR';rec.continuous=true;rec.interimResults=false;
  rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal){const t=$('raw');t.value+=(t.value&&!t.value.endsWith('\n')?' ':'')+e.results[i][0].transcript.trim()}};
- rec.onerror=e=>{$('ms').textContent='Erreur micro : '+e.error};
+ rec.onerror=e=>{if(e.error==='no-speech'||e.error==='aborted')return;on=false;ui(false);$('ms').textContent=e.error==='network'?'Reconnaissance vocale injoignable (réseau, VPN, bloqueur ou navigateur). Utilisez la dictée de votre clavier (Windows : touche Windows + H) dans le champ ci-dessous.':e.error==='not-allowed'?'Micro refusé : autorisez-le dans la barre d\'adresse du navigateur.':'Erreur micro : '+e.error};
  rec.onend=()=>{if(on)try{rec.start()}catch(_){}else ui(false)};
  on=true;try{rec.start();ui(true)}catch(_){on=false}
 };

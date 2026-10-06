@@ -99,10 +99,16 @@ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec,on=fal
 $('mic').onclick=()=>{
  if(!SR){$('ms').textContent='Dictée non supportée : utilisez Chrome ou Safari.';return}
  if(on){on=false;rec.stop();return}
- rec=new SR();rec.lang='fr-FR';rec.continuous=true;rec.interimResults=false;
- rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal){const t=$('raw');t.value+=(t.value&&!t.value.endsWith('\n')?' ':'')+e.results[i][0].transcript.trim()}};
+ const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
+ rec=new SR();rec.lang='fr-FR';rec.continuous=!mobile;rec.interimResults=true;
+ let base=$('raw').value;const sp=()=>base&&!/\s$/.test(base)?' ':'';
+ rec.onaudiostart=()=>{$('ms').textContent='Micro actif : parlez…'};
+ rec.onspeechstart=()=>{$('ms').textContent='Voix détectée…'};
+ rec.onresult=e=>{let fin='',it='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)fin+=t;else it+=t}
+  if(fin)base+=sp()+fin.trim();
+  $('raw').value=base+(it?sp()+it.trim():'')};
  rec.onerror=e=>{if(e.error==='no-speech'||e.error==='aborted')return;on=false;ui(false);$('ms').textContent=e.error==='network'?'Reconnaissance vocale injoignable (réseau, VPN, bloqueur ou navigateur). Utilisez la dictée de votre clavier (Windows : touche Windows + H) dans le champ ci-dessous.':e.error==='not-allowed'?'Micro refusé : autorisez-le dans la barre d\'adresse du navigateur.':'Erreur micro : '+e.error};
- rec.onend=()=>{if(on)try{rec.start()}catch(_){}else ui(false)};
+ rec.onend=()=>{if(on){base=$('raw').value;try{rec.start()}catch(_){}}else ui(false)};
  on=true;try{rec.start();ui(true)}catch(_){on=false}
 };
 function ui(a){$('mic').textContent=a?'⏹ Arrêter':'🎙️ Dicter';$('mic').className=a?'rec':'';$('ms').textContent=a?'Écoute en cours…':''}

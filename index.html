@@ -138,7 +138,7 @@ function makeDOC(){
 const name=()=>'compte-rendu-'+($('date').value||'sans-date');
 const API_URL='https://appli-ia-transcription.akparis13.workers.dev';
 let dl=null;
-if(window.claude){claude.use('downloads').then(x=>dl=x).catch(()=>{})}
+if(window.claude&&typeof claude.use==='function'){claude.use('downloads').then(x=>dl=x).catch(()=>{})}
 async function save(b,n){
  if(dl){try{await dl.save({filename:n,data:b});return}catch(e){if(e.code==='declined')return}}
  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click()}
